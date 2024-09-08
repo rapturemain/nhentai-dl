@@ -1,4 +1,4 @@
-package org.lifeutils.nhentaidl.dto
+package org.lifeutils.nhentaidl.model
 
 @JvmInline
 value class HentaiId(val id: Int)

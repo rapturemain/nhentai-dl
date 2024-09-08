@@ -1,9 +1,13 @@
 package org.lifeutils.nhentaidl
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.lifeutils.nhentaidl.config.AppHeaderConfig
 import org.lifeutils.nhentaidl.config.Header
-import org.lifeutils.nhentaidl.scraper.Language
-import org.lifeutils.nhentaidl.scraper.SearchScraper
+import org.lifeutils.nhentaidl.config.WriterConfig
+import org.lifeutils.nhentaidl.log.StdoutLogger
+import org.lifeutils.nhentaidl.model.HentaiId
+import org.lifeutils.nhentaidl.scraper.HentaiScraper
+import org.lifeutils.nhentaidl.writer.FileHentaiWriter
 import java.io.File
 import java.net.http.HttpClient
 
@@ -19,14 +23,25 @@ fun main() {
         )
     )
 
-    val searchScraper = SearchScraper(httpClient, appHeaderConfig)
+    val stdoutLogger = StdoutLogger()
+    val objectMapper = ObjectMapper()
+        .findAndRegisterModules()
 
-    val ids = searchScraper.search(Language.ENGLISH)
+    val hentaiWriter = FileHentaiWriter(
+        writerConfig = WriterConfig(
+            directory = File("hentaiOutput").also { it.mkdirs() }
+        ),
+        objectMapper = objectMapper
+    )
 
-    val file = File("searchResult.txt")
+    val hentaiScraper = HentaiScraper(
+        httpClient = httpClient,
+        headerConfig = appHeaderConfig,
+        hentaiWriter = hentaiWriter,
+        log = stdoutLogger
+    )
 
-    file.writeText(ids.ids.map { it.id }.joinToString("\n"))
+    hentaiScraper.hentai(HentaiId(529107))
 
-    println("Total count: ${ids.totalCount}")
-    println("Failed pages: ${ids.failedPages.size}")
+    stdoutLogger.close()
 }

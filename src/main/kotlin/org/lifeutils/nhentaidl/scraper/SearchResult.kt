@@ -1,6 +1,6 @@
 package org.lifeutils.nhentaidl.scraper
 
-import org.lifeutils.nhentaidl.dto.HentaiId
+import org.lifeutils.nhentaidl.model.HentaiId
 
 data class SearchResult(
     val totalCount: Int,
