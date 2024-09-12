@@ -39,7 +39,7 @@ fun scrapHentaiTitlePage(id: HentaiId, content: String): HentaiScrapResult {
 }
 
 private fun extractHentaiInfo(id: HentaiId, doc: Document): HentaiInfo {
-    val title = doc.select(TITLE_SELECTOR).joinToString(separator = " ", transform = Element::text)
+    val title = doc.select(TITLE_SELECTOR).joinToString(separator = " ", transform = Element::text).trim()
 
     val tagsElement = doc.select(TAGS_SELECTOR)
     val tags = tagsElement.mapNotNull(::extractTags).toMap()

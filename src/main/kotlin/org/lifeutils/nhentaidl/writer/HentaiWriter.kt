@@ -1,15 +1,19 @@
 package org.lifeutils.nhentaidl.writer
 
+import io.ktor.utils.io.ByteReadChannel
 import org.lifeutils.nhentaidl.model.HentaiInfo
 import org.lifeutils.nhentaidl.model.HentaiId
-import java.io.InputStream
 
 interface HentaiWriter<Meta : HentaiWriterMeta> {
-    fun getWriterMeta(hentaiInfo: HentaiInfo): Meta
+    suspend fun getWriterMeta(hentaiInfo: HentaiInfo): Result<Meta>
 
-    fun writeHentaiInfo(meta: Meta, hentaiInfo: HentaiInfo): Result<Unit>
+    suspend fun writeHentaiInfo(meta: Meta, hentaiInfo: HentaiInfo): Result<Unit>
 
-    fun writeImage(meta: Meta, name: String, imageInputStream: InputStream): Result<Unit>
+    suspend fun writeImage(meta: Meta, name: String, size: Long, byteReadChannel: ByteReadChannel): Result<Unit>
+
+    suspend fun finish(meta: Meta): Result<Unit> = Result.success(Unit)
+
+    fun flush() = Unit
 }
 
 interface HentaiWriterMeta {

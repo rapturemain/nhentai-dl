@@ -9,6 +9,8 @@ repositories {
     mavenCentral()
 }
 
+val ktorVersion: String by project
+
 dependencies {
     testImplementation(kotlin("test"))
 
@@ -18,6 +20,14 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
+
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+
+    implementation("org.slf4j:slf4j-api:2.0.16")
+    implementation("org.slf4j:slf4j-simple:2.0.16")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-cli:0.3.6")
 }
 
 tasks.test {

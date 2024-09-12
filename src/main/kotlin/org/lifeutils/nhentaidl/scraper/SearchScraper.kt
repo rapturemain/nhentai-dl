@@ -1,18 +1,18 @@
 package org.lifeutils.nhentaidl.scraper
 
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+import io.ktor.client.request.url
+import io.ktor.client.statement.bodyAsText
 import org.jsoup.Jsoup
-import org.lifeutils.nhentaidl.config.AppHeaderConfig
+import org.lifeutils.nhentaidl.config.HttpConfig
+import org.lifeutils.nhentaidl.config.HentaiIdProvider
+import org.lifeutils.nhentaidl.config.SearchConfig
+import org.lifeutils.nhentaidl.log.Logger
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.Language
-import org.lifeutils.nhentaidl.log.Logger
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 
 private const val BASE_URL_LANGUAGE = "https://nhentai.net/language/%language%/"
-
-private const val PAGE_FETCH_RETRY_COUNT = 5
 
 private const val HREF_HENTAI_SELECTOR = "div.container div.gallery a"
 private fun extractIdFromHref(href: String) = href.split("/")
@@ -26,15 +26,15 @@ private fun extractLastPageFromHref(href: String) = href.split("=")
 
 class SearchScraper(
     private val httpClient: HttpClient,
-    private val headerConfig: AppHeaderConfig,
+    private val httpConfig: HttpConfig,
     private val log: Logger,
-) {
+) : HentaiIdProvider<SearchConfig> {
 
-    fun search(language: Language, pages: IntRange = 1..<Int.MAX_VALUE): SearchResult {
+    suspend fun search(language: Language, pages: IntRange = 1..<Int.MAX_VALUE): SearchResult {
         return fetchPages(BASE_URL_LANGUAGE.replace("%language%", language.searchParam), pages)
     }
 
-    private fun fetchPages(baseUrl: String, pages: IntRange): SearchResult {
+    private suspend fun fetchPages(baseUrl: String, pages: IntRange): SearchResult {
         val allIds = mutableSetOf<HentaiId>()
         val failedPages = mutableListOf<String>()
 
@@ -55,7 +55,7 @@ class SearchScraper(
                 failedPages.add("BaseUrl: $baseUrl, page=$page")
             }
 
-            waitTillNextRequest()
+            waitTillNextRequest(httpConfig.requestDelayInMillis)
         }
 
         return SearchResult(
@@ -81,51 +81,33 @@ class SearchScraper(
         return ScrapResult(ids, lastPage)
     }
 
-    private fun fetchPage(baseUrl: String, page: Int, totalPages: Int?): String {
-        val uri = makeUri(baseUrl, page)
+    private suspend fun fetchPage(baseUrl: String, page: Int, totalPages: Int?): String {
+        val url = "$baseUrl?page=$page"
+        return retryHttpRequest(delayMillis = httpConfig.requestDelayInMillis) {
+            log("Fetching page $url" + if (totalPages != null) " of $totalPages" else "")
 
-        val request = HttpRequest.newBuilder(uri)
-            .GET()
-            .addHeaders(headerConfig)
-            .build()
-
-        var lastException: Exception? = null
-        repeat(PAGE_FETCH_RETRY_COUNT) {
-            try {
-                log("Fetching page $uri" + if (totalPages != null) " of $totalPages" else "")
-
-                val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-                if (!response.isSucceeded()) {
-                    throw CannotFetchException(
-                        message = "Cannot fetch [$uri]. Response code: ${response.statusCode()}. Body: ${response.body()}"
-                    )
-                }
-                return response.body()
-            } catch (e: Exception) {
-                log("Failed to fetch page $uri. Retrying...\n Failed page exception: $e")
-                lastException = e
-                waitTillNextRequest()
+            httpClient.get {
+                url(url)
+                addHeaders(httpConfig)
             }
         }
+            .getOrElse {
+                log("Failed to fetch page $url after several retries. Exception: $it")
+                throw it
+            }
+            .bodyAsText()
+    }
 
-        log("Failed to fetch page $uri after $PAGE_FETCH_RETRY_COUNT retries. Exception: $lastException")
-
-        throw if (lastException is CannotFetchException) {
-            lastException!!
-        } else {
-            CannotFetchException(
-                message = "Cannot fetch [$uri]",
-                cause = lastException
-            )
+    override suspend fun provideIdsToDownload(config: SearchConfig): Result<List<HentaiId>> {
+        val searchResult = search(config.searchLanguage)
+        if (searchResult.failedPages.isNotEmpty()) {
+            return Result.failure(CannotFetchException("Failed to fetch pages: ${searchResult.failedPages}"))
         }
+        return Result.success(searchResult.ids)
     }
 }
 
-private fun makeUri(baseUrl: String, page: Int): URI {
-    return URI.create("$baseUrl?page=$page")
-}
-
-data class ScrapResult(
+private data class ScrapResult(
     val ids: List<HentaiId>,
-    val totalPages: Int?
+    val totalPages: Int?,
 )
