@@ -52,7 +52,7 @@ class FileHentaiWriter(
             byteReadChannel.readFully(bytes)
 
             imageVerifier?.verify(bytes)?.onFailure {
-                log.error("Image verification failed: $name. ${it.getMessageWithCause()}")
+                log.error("Image verification failed: ${meta.hentaiId.id}:$name. ${it.getMessageWithCause()}")
                 return Result.failure(it)
             }
 

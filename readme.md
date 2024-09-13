@@ -16,7 +16,7 @@ Other available options can be viewed by running:
 java -jar nhentai-dl.jar -h
 ```
 
-Java 21 is required to run this program.
+Java 17 or higher is required to run this program.
 
 ## Motivation
 

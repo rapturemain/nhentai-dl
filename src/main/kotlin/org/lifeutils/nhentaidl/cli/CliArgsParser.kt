@@ -27,7 +27,7 @@ class CliArgsParser(args: Array<String>) : ArgParser("nhentai-dl") {
     private val bufferedWriterBufferSize: Int by option(
         ArgType.Int,
         shortName = "writer-buffer",
-        description = "Number of titles to keep in memory until flushing to disk. Applied only to ZIP_ARCHIVE output format. " +
+        description = "Number of titles to keep in memory before flushing to disk. Applied only to ZIP_ARCHIVE output format. " +
                 "Useful for saving HDD resource by writing large chunk of data at once. Significantly increases memory usage." +
                 "(actual reason is that my external HDD always clicks when it is used, so I prefer having less clicks by writing in large chunks)"
     )

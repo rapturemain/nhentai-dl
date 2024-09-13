@@ -98,8 +98,6 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
     }
 
     private suspend fun fetchImage(writerMeta: WriterMeta, hentaiPage: HentaiPage): Result<Unit> {
-        log("Fetching image ${hentaiPage.page} of hentai ${writerMeta.hentaiId.id}: ${hentaiPage.url}")
-
         val response = retryHttpRequest(delayMillis = httpConfig.requestDelayInMillis) {
             tryOtherHentaiCdns(hentaiPage.url) { url ->
                 val response = httpClient.get {

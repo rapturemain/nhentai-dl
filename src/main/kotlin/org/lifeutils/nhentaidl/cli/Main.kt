@@ -2,6 +2,8 @@ package org.lifeutils.nhentaidl.cli
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.Dispatchers
@@ -35,8 +37,10 @@ suspend fun main(args: Array<String>) {
 
     val stdoutLogger = StdoutLogger()
     val objectMapper = ObjectMapper()
-        .findAndRegisterModules()
+        .registerModule(JavaTimeModule())
+        .registerKotlinModule()
         .enable(SerializationFeature.INDENT_OUTPUT)
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     val imageVerifier = if (config.verifyImages) {
         ImageVerifierFactory().createImageVerifier()

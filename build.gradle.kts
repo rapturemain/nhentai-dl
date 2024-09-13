@@ -1,9 +1,10 @@
 plugins {
     kotlin("jvm") version "2.0.0"
+    application
 }
 
 group = "org.lifeutils"
-version = "1.0-SNAPSHOT"
+version = "1.0"
 
 repositories {
     mavenCentral()
@@ -14,7 +15,6 @@ val ktorVersion: String by project
 dependencies {
     testImplementation(kotlin("test"))
 
-    implementation(kotlin("reflect"))
     implementation("org.jsoup:jsoup:1.18.1")
 
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
@@ -33,6 +33,24 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "org.lifeutils.nhentaidl.cli.MainKt"
+    }
+
+    val dependencies = configurations
+        .runtimeClasspath
+        .get()
+        .map(::zipTree)
+    from(dependencies)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 kotlin {
-    jvmToolchain(21)
+    jvmToolchain(17)
+}
+
+application {
+    mainClass = "org.lifeutils.nhentaidl.cli.MainKt"
 }

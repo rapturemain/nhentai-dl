@@ -8,7 +8,7 @@ data class HentaiInfo(
     val subTitle: String,
     val pageCount: Int,
     val metadata: HentaiMetadata,
-    val metadataVersion: Int = 2,
+    val metadataVersion: Int = 3,
 )
 
 data class HentaiMetadata(
