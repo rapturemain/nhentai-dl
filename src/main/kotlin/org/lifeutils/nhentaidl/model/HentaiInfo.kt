@@ -5,8 +5,10 @@ import java.time.ZonedDateTime
 data class HentaiInfo(
     val id: HentaiId,
     val title: String,
+    val subTitle: String,
     val pageCount: Int,
     val metadata: HentaiMetadata,
+    val metadataVersion: Int = 2,
 )
 
 data class HentaiMetadata(

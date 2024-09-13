@@ -11,6 +11,7 @@ import java.time.ZonedDateTime
 
 private const val METADATA_SELECTOR = "div#info"
 private const val TITLE_SELECTOR = "$METADATA_SELECTOR h1.title span"
+private const val SUBTITLE_SELECTOR = "$METADATA_SELECTOR h2.title span"
 private const val TAGS_SELECTOR = "$METADATA_SELECTOR section#tags div.tag-container"
 private const val TAG_VALUE_SELECTOR = "span.name"
 private const val PAGES_SELECTOR = "div.thumbs div.thumb-container"
@@ -23,7 +24,7 @@ data class HentaiScrapResult(
 data class HentaiPage(
     val page: Int,
     val fileName: String,
-    val url: String
+    val url: String,
 )
 
 fun scrapHentaiTitlePage(id: HentaiId, content: String): HentaiScrapResult {
@@ -40,6 +41,7 @@ fun scrapHentaiTitlePage(id: HentaiId, content: String): HentaiScrapResult {
 
 private fun extractHentaiInfo(id: HentaiId, doc: Document): HentaiInfo {
     val title = doc.select(TITLE_SELECTOR).joinToString(separator = " ", transform = Element::text).trim()
+    val subTitle = doc.select(SUBTITLE_SELECTOR).joinToString(separator = " ", transform = Element::text).trim()
 
     val tagsElement = doc.select(TAGS_SELECTOR)
     val tags = tagsElement.mapNotNull(::extractTags).toMap()
@@ -49,6 +51,7 @@ private fun extractHentaiInfo(id: HentaiId, doc: Document): HentaiInfo {
     return HentaiInfo(
         id = id,
         title = title,
+        subTitle = subTitle,
         pageCount = pageCount,
         metadata = HentaiMetadata(
             parodies = tags.tag(TagType.Parodies),

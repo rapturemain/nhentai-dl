@@ -14,18 +14,56 @@ import org.lifeutils.nhentaidl.model.Language
 import java.io.File
 
 class CliArgsParser(args: Array<String>) : ArgParser("nhentai-dl") {
-    val idsFile: String? by option(ArgType.String, shortName = "ids", description = "Path to a file containing new-line separated ids")
-    val searchLanguage: Language? by option(ArgType.Choice<Language>(), shortName = "lang", description = "Language to search IDs for")
-    val id: Int? by option(ArgType.Int, shortName = "id", description = "ID of a hentai to download")
+    // ids config
+    private val idsFile: String? by option(ArgType.String, shortName = "ids", description = "Path to a file containing new-line separated ids")
+    private val searchLanguage: Language? by option(ArgType.Choice<Language>(), shortName = "lang", description = "Language to search IDs for")
+    private val id: Int? by option(ArgType.Int, shortName = "id", description = "ID of a hentai to download")
+    private val countLimit: Int? by option(ArgType.Int, shortName = "count", description = "Number of titles to download (unlimited by default)")
 
-    val outputDir: String by option(ArgType.String, shortName = "o", description = "Output directory").default("./")
-    val outputFormat: OutputFormat by option(ArgType.Choice<OutputFormat>(), shortName = "f", description = "Output format").default(OutputFormat.PLAIN_IMAGES)
+    // writer config
+    private val outputDir: String by option(ArgType.String, shortName = "o", description = "Output directory").default("./")
+    private val outputFormat: OutputFormat by option(ArgType.Choice<OutputFormat>(), shortName = "f", description = "Output format").default(OutputFormat.PLAIN_IMAGES)
+    private val failedIdsPath: String by option(ArgType.String, shortName = "failed", description = "Path to a file to save failed IDs").default("failed-ids.txt")
+    private val bufferedWriterBufferSize: Int by option(
+        ArgType.Int,
+        shortName = "writer-buffer",
+        description = "Number of titles to keep in memory until flushing to disk. Applied only to ZIP_ARCHIVE output format. " +
+                "Useful for saving HDD resource by writing large chunk of data at once. Significantly increases memory usage." +
+                "(actual reason is that my external HDD always clicks when it is used, so I prefer having less clicks by writing in large chunks)"
+    )
+        .default(20)
 
-    val userAgent: String by option(ArgType.String, shortName = "ua", description = "User-Agent to use for requests").required()
-    val cookies: String by option(ArgType.String, shortName = "ck", description = "Cookies to use for requests").required()
-    val requestDelayInMillis: Int by option(ArgType.Int, shortName = "delay", description = "Delay between requests in milliseconds").default(100)
-    val concurrencyLevelImage: Int by option(ArgType.Int, shortName = "concurrency-image", description = "Number of concurrent requests").default(10)
-    val concurrencyLevelTitle: Int by option(ArgType.Int, shortName = "concurrency-title", description = "Number of concurrent requests").default(2)
+    // http config
+    private val userAgent: String by option(ArgType.String, shortName = "ua", description = "User-Agent to use for requests").required()
+    private val cookies: String by option(ArgType.String, shortName = "ck", description = "Cookies to use for requests").required()
+    private val requestDelayInMillis: Int by option(
+        ArgType.Int,
+        shortName = "delay",
+        description = "Delay between requests in milliseconds in case of failure. " +
+                "Each subsequent failure will have greater retryDelay = [retry^2 * delay]. " +
+                "Retries capped at 5"
+    )
+        .default(1000)
+    private val concurrencyLevelImage: Int by option(
+        ArgType.Int,
+        shortName = "concurrency-image",
+        description = "Number of concurrent requests for images per title. " +
+                "Total number of simultaneous requests = [concurrency-image * concurrency-title]"
+    )
+        .default(10)
+    private val concurrencyLevelTitle: Int by option(
+        ArgType.Int,
+        shortName = "concurrency-title",
+        description = "Number of concurrent titles to download at once"
+    )
+        .default(2)
+
+    private val verifyImages: Boolean by option(
+        ArgType.Boolean,
+        shortName = "verify-images",
+        description = "Whether to verify images before saving them. Increases memory and CPU usage."
+    )
+        .default(false)
 
     init {
         parse(args)
@@ -57,7 +95,8 @@ class CliArgsParser(args: Array<String>) : ArgParser("nhentai-dl") {
 
     fun toConfig(): Config {
         val writerConfig = WriterConfig(
-            directory = File(outputDir)
+            directory = File(outputDir),
+            flushBufferSize = bufferedWriterBufferSize
         )
         val httpConfig = HttpConfig(
             headers = listOf(
@@ -81,7 +120,10 @@ class CliArgsParser(args: Array<String>) : ArgParser("nhentai-dl") {
             idToDownload = id?.let { HentaiId(it) },
             searchConfig = searchConfig,
             fileHentaiProviderConfig = fileHentaiProviderConfig,
-            outputFormat = outputFormat
+            outputFormat = outputFormat,
+            verifyImages = verifyImages,
+            countLimit = countLimit,
+            failedIdsPath = failedIdsPath
         )
     }
 }
@@ -92,5 +134,8 @@ data class Config(
     val idToDownload: HentaiId?,
     val searchConfig: SearchConfig?,
     val fileHentaiProviderConfig: FileHentaiIdProviderConfig?,
-    val outputFormat: OutputFormat
+    val outputFormat: OutputFormat,
+    val verifyImages: Boolean,
+    val countLimit: Int?,
+    val failedIdsPath: String,
 )

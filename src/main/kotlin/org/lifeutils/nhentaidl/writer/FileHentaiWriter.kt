@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readFully
 import org.lifeutils.nhentaidl.config.WriterConfig
+import org.lifeutils.nhentaidl.getMessageWithCause
+import org.lifeutils.nhentaidl.imageverifier.ImageVerifier
+import org.lifeutils.nhentaidl.log.Logger
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.HentaiInfo
 import java.io.File
@@ -13,6 +16,8 @@ private const val METADATA_FILE_NAME = "metadata.json"
 class FileHentaiWriter(
     private val writerConfig: WriterConfig,
     private val objectMapper: ObjectMapper,
+    private val log: Logger,
+    private val imageVerifier: ImageVerifier? = null,
 ) : HentaiWriter<FileHentaiWriterMeta> {
 
     override suspend fun getWriterMeta(hentaiInfo: HentaiInfo): Result<FileHentaiWriterMeta> {
@@ -26,6 +31,9 @@ class FileHentaiWriter(
                                 "${saveDirectory.canonicalPath} is not a subdirectory of ${writerConfig.directory.canonicalPath}"
                     )
                 )
+            }
+            if (saveDirectory.exists()) {
+                return Result.failure(AlreadyExistsException(saveDirectory))
             }
             return Result.success(FileHentaiWriterMeta(hentaiInfo.id, saveDirectory))
         } catch (e: Exception) {
@@ -42,6 +50,11 @@ class FileHentaiWriter(
 
             val bytes = ByteArray(size.toInt())
             byteReadChannel.readFully(bytes)
+
+            imageVerifier?.verify(bytes)?.onFailure {
+                log.error("Image verification failed: $name. ${it.getMessageWithCause()}")
+                return Result.failure(it)
+            }
 
             file.outputStream().use { outputStream ->
                 outputStream.write(bytes)

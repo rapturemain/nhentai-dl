@@ -3,9 +3,12 @@ package org.lifeutils.nhentaidl.scraper
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.url
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
@@ -15,6 +18,7 @@ import org.lifeutils.nhentaidl.log.Logger
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.writer.HentaiWriter
 import org.lifeutils.nhentaidl.writer.HentaiWriterMeta
+import java.util.concurrent.atomic.AtomicBoolean
 
 private const val BASE_URL_HENTAI = "https://nhentai.net/g/%hentaiId%/"
 
@@ -48,12 +52,20 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
         }
 
         val semaphore = Semaphore(httpConfig.concurrencyLevelImage)
+        val imageDownloadFailureOccurred = AtomicBoolean(false)
 
         coroutineScope {
             val jobs = info.pages.map { hentaiPage ->
-                async {
+                async(Dispatchers.IO) {
                     semaphore.withPermit {
-                        fetchImage(writerMeta, hentaiPage)
+                        if (imageDownloadFailureOccurred.get()) {
+                            return@async Result.success(Unit)
+                        }
+                        val result = fetchImage(writerMeta, hentaiPage)
+                        if (result.isFailure) {
+                            imageDownloadFailureOccurred.set(true)
+                        }
+                        result
                     }
                 }
             }
@@ -89,10 +101,18 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
         log("Fetching image ${hentaiPage.page} of hentai ${writerMeta.hentaiId.id}: ${hentaiPage.url}")
 
         val response = retryHttpRequest(delayMillis = httpConfig.requestDelayInMillis) {
-            httpClient.get {
-                url(hentaiPage.url)
-                addHeaders(httpConfig)
+            tryOtherHentaiCdns(hentaiPage.url) { url ->
+                val response = httpClient.get {
+                    url(url)
+                    addHeaders(httpConfig)
+                }
+                if (response.status == HttpStatusCode.NotFound) {
+                    return@tryOtherHentaiCdns FetchResult(false, response)
+                } else {
+                    return@tryOtherHentaiCdns FetchResult(true, response)
+                }
             }
+                .response
         }
             .getOrElse {
                 return Result.failure(it)
@@ -111,3 +131,39 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
         return Result.success(Unit)
     }
 }
+
+private val knownCdnHosts = listOf(
+    "i3",
+    "i5",
+    "i7",
+    "i"
+)
+
+private val cdnRegex = Regex("(?<=/)i\\d(?=\\.)")
+
+/**
+ * Sometimes page is stored on other server than its thumbnail, so we should try other servers.
+ */
+private inline fun tryOtherHentaiCdns(url: String, block: (url: String) -> FetchResult): FetchResult {
+    val initialResult = block(url)
+    if (initialResult.isSuccess) {
+        return initialResult
+    }
+
+    for (host in knownCdnHosts.shuffled()) {
+        val newUrl = url.replace(cdnRegex, host)
+        if (newUrl != url) {
+            val result = block(newUrl)
+            if (result.isSuccess) {
+                return result
+            }
+        }
+    }
+
+    return initialResult
+}
+
+private data class FetchResult(
+    val isSuccess: Boolean,
+    val response: HttpResponse,
+)

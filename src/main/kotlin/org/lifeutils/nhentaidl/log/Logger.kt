@@ -1,7 +1,9 @@
 package org.lifeutils.nhentaidl.log
 
 interface Logger {
-    fun log(message: String)
+    fun info(message: String)
 
-    operator fun invoke(message: String) = log(message)
+    fun error(message: String)
+
+    operator fun invoke(message: String) = info(message)
 }

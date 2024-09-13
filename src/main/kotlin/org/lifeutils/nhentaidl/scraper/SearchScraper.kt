@@ -92,7 +92,7 @@ class SearchScraper(
             }
         }
             .getOrElse {
-                log("Failed to fetch page $url after several retries. Exception: $it")
+                log.error("Failed to fetch page $url after several retries. Exception: $it")
                 throw it
             }
             .bodyAsText()
@@ -103,7 +103,7 @@ class SearchScraper(
         if (searchResult.failedPages.isNotEmpty()) {
             return Result.failure(CannotFetchException("Failed to fetch pages: ${searchResult.failedPages}"))
         }
-        return Result.success(searchResult.ids)
+        return Result.success(searchResult.ids.sortedBy { it.id })
     }
 }
 

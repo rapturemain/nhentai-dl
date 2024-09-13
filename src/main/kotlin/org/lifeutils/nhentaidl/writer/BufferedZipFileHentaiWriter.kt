@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readFully
 import org.lifeutils.nhentaidl.config.WriterConfig
+import org.lifeutils.nhentaidl.getMessageWithCause
+import org.lifeutils.nhentaidl.imageverifier.ImageVerifier
 import org.lifeutils.nhentaidl.log.Logger
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.HentaiInfo
@@ -14,12 +16,12 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 private const val METADATA_FILE_NAME = "metadata.json"
-private const val MAX_FILES_TO_SAVE_IN_MEMORY = 100
 
 class BufferedZipFileHentaiWriter(
     private val writerConfig: WriterConfig,
     private val objectMapper: ObjectMapper,
     private val log: Logger,
+    private val imageVerifier: ImageVerifier? = null,
 ) : HentaiWriter<BufferedZipFileHentaiWriterMeta> {
 
     private val filesToSaveBuffer = ConcurrentLinkedDeque<InMemoryFile>()
@@ -35,6 +37,9 @@ class BufferedZipFileHentaiWriter(
                                 "${zipFile.canonicalPath} is not a subdirectory of ${writerConfig.directory.canonicalPath}"
                     )
                 )
+            }
+            if (zipFile.exists()) {
+                return Result.failure(AlreadyExistsException(zipFile))
             }
             return Result.success(BufferedZipFileHentaiWriterMeta(hentaiInfo.id, zipFile))
         } catch (e: Exception) {
@@ -56,7 +61,7 @@ class BufferedZipFileHentaiWriter(
 
             filesToSaveBuffer.add(InMemoryFile(meta.zipFile, buffer.toByteArray()))
 
-            if (filesToSaveBuffer.size > MAX_FILES_TO_SAVE_IN_MEMORY) {
+            if (filesToSaveBuffer.size > writerConfig.flushBufferSize) {
                 flush()
             }
 
@@ -74,6 +79,11 @@ class BufferedZipFileHentaiWriter(
             byteReadChannel.readFully(byteArray)
         } catch (e: Exception) {
             return Result.failure(e)
+        }
+
+        imageVerifier?.verify(byteArray)?.onFailure {
+            log.error("Image verification failed: $name. ${it.getMessageWithCause()}")
+            return Result.failure(it)
         }
 
         meta.files.add(InMemoryContents(escapedName, byteArray))
