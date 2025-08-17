@@ -1,21 +1,21 @@
 package org.lifeutils.nhentaidl.writer
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.readFully
+import kotlinx.coroutines.sync.Mutex
 import org.lifeutils.nhentaidl.config.WriterConfig
 import org.lifeutils.nhentaidl.getMessageWithCause
 import org.lifeutils.nhentaidl.imageverifier.ImageVerifier
 import org.lifeutils.nhentaidl.log.Logger
+import org.lifeutils.nhentaidl.model.AppMetadata
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.HentaiInfo
+import org.lifeutils.nhentaidl.model.ImageVerificationStatus
+import org.lifeutils.nhentaidl.model.Metadata
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
-
-private const val METADATA_FILE_NAME = "metadata.json"
 
 class BufferedZipFileHentaiWriter(
     private val writerConfig: WriterConfig,
@@ -25,11 +25,22 @@ class BufferedZipFileHentaiWriter(
 ) : HentaiWriter<BufferedZipFileHentaiWriterMeta> {
 
     private val filesToSaveBuffer = ConcurrentLinkedDeque<InMemoryFile>()
+    private val flushLock = Mutex()
 
-    override suspend fun getWriterMeta(hentaiInfo: HentaiInfo): Result<BufferedZipFileHentaiWriterMeta> {
+    override suspend fun getWriterMeta(
+        hentaiInfo: HentaiInfo,
+        allowRewrite: Boolean,
+        desiredName: String?,
+    ): Result<BufferedZipFileHentaiWriterMeta> {
         try {
-            val saveName = "[${hentaiInfo.id.id}] ${hentaiInfo.title}".toValidFileName().trim()
-            val zipFile = writerConfig.directory.resolve("$saveName.zip".trim())
+            val fixedDesiredName = desiredName?.toValidFileName()
+                ?.addExtensionIfNotPresent(".zip")
+
+            val saveName =
+                fixedDesiredName ?: ("[${hentaiInfo.id.id}] ${hentaiInfo.title}".toValidFileName().trim() + ".zip")
+
+            val zipFile = writerConfig.directory.resolve(saveName)
+
             if (zipFile.isTraversal(writerConfig.directory)) {
                 return Result.failure(
                     IllegalArgumentException(
@@ -38,13 +49,34 @@ class BufferedZipFileHentaiWriter(
                     )
                 )
             }
-            if (zipFile.exists()) {
+
+            if (!allowRewrite && zipFile.exists()) {
                 return Result.failure(AlreadyExistsException(zipFile))
             }
-            return Result.success(BufferedZipFileHentaiWriterMeta(hentaiInfo.id, zipFile))
+
+            val appMetadata = AppMetadata(
+                imageVerificationStatus = when (imageVerifier) {
+                    null -> ImageVerificationStatus.NOT_VERIFIED
+                    // do not cover VERIFICATION_FAILED, since we don't save failed doujinshi
+                    else -> ImageVerificationStatus.VERIFICATION_PASSED
+                }
+            )
+
+            return Result.success(
+                BufferedZipFileHentaiWriterMeta(
+                    hentaiId = hentaiInfo.id,
+                    appMetadata = appMetadata,
+                    zipFile = zipFile,
+                )
+            )
         } catch (e: Exception) {
             return Result.failure(e)
         }
+    }
+
+    override suspend fun abort(meta: BufferedZipFileHentaiWriterMeta): Result<Unit> {
+        // since we're buffering everything in a metadata object itself, it's enough just to let GC clean it up
+        return Result.success(Unit)
     }
 
     override suspend fun finish(meta: BufferedZipFileHentaiWriterMeta): Result<Unit> {
@@ -71,29 +103,31 @@ class BufferedZipFileHentaiWriter(
         }
     }
 
-    override suspend fun writeImage(meta: BufferedZipFileHentaiWriterMeta, name: String, size: Long, byteReadChannel: ByteReadChannel): Result<Unit> {
+    override suspend fun writeImage(
+        meta: BufferedZipFileHentaiWriterMeta,
+        name: String,
+        contents: ByteArray,
+    ): Result<Unit> {
         val escapedName = name.replace(Regex("[^\\w.]+"), "")
-        val byteArray = ByteArray(size.toInt())
 
-        try {
-            byteReadChannel.readFully(byteArray)
-        } catch (e: Exception) {
-            return Result.failure(e)
-        }
-
-        imageVerifier?.verify(byteArray)?.onFailure {
+        imageVerifier?.verify(contents)?.onFailure {
             log.error("Image verification failed: ${meta.hentaiId.id}:$name. ${it.getMessageWithCause()}")
             return Result.failure(it)
         }
 
-        meta.files.add(InMemoryContents(escapedName, byteArray))
+        meta.files.add(InMemoryContents(escapedName, contents))
 
         return Result.success(Unit)
     }
 
     override suspend fun writeHentaiInfo(meta: BufferedZipFileHentaiWriterMeta, hentaiInfo: HentaiInfo): Result<Unit> {
         try {
-            val bytes = objectMapper.writeValueAsBytes(hentaiInfo)
+            val metadata = Metadata(
+                hentaiInfo = hentaiInfo,
+                appMetadata = meta.appMetadata
+            )
+
+            val bytes = objectMapper.writeValueAsBytes(metadata)
 
             meta.files.add(InMemoryContents(METADATA_FILE_NAME, bytes))
 
@@ -103,12 +137,29 @@ class BufferedZipFileHentaiWriter(
         }
     }
 
-    override fun flush() {
+    override suspend fun flush() {
+        if (filesToSaveBuffer.size > writerConfig.flushBufferSize * 4) {
+            log.info("Writer buffer is too large. Flushing...")
+            flushInternal()
+            return
+        }
+
+        if (!flushLock.tryLock()) {
+            return
+        }
+
+        try {
+            flushInternal()
+        } finally {
+            flushLock.unlock()
+        }
+    }
+
+    private fun flushInternal() {
         log("Flushing files to disk")
 
         var count = 0
-        var inMemFile = filesToSaveBuffer.poll()
-        while (inMemFile != null) {
+        for (inMemFile in generateSequence { filesToSaveBuffer.poll() }) {
             count++
 
             inMemFile.file.parentFile.mkdirs()
@@ -116,8 +167,6 @@ class BufferedZipFileHentaiWriter(
             inMemFile.file.outputStream().use { outputStream ->
                 outputStream.write(inMemFile.contents)
             }
-
-            inMemFile = filesToSaveBuffer.poll()
         }
 
         log("Flushed $count files to disk")
@@ -126,6 +175,7 @@ class BufferedZipFileHentaiWriter(
 
 data class BufferedZipFileHentaiWriterMeta(
     override val hentaiId: HentaiId,
+    override val appMetadata: AppMetadata,
     val zipFile: File,
     val files: MutableList<InMemoryContents> = mutableListOf(),
 ) : HentaiWriterMeta

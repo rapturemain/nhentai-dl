@@ -1,20 +1,14 @@
 package org.lifeutils.nhentaidl.imageverifier
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.InputStream
-import javax.imageio.ImageReader
+import javax.imageio.ImageIO
 import kotlin.math.abs
 
 private val BROKEN_IMAGE_THRESHOLD = 0.07
 
-class BlankLineImageVerifier(
-    private val imageReader: ImageReader,
-) : ImageVerifier {
-
-    private val imageReaderMutex = Mutex()
+class BlankLineImageVerifier : ImageVerifier {
 
     override suspend fun verify(context: ImageVerifierContext): Result<Unit> {
         return runCatching {
@@ -32,22 +26,25 @@ class BlankLineImageVerifier(
         }
     }
 
-    private suspend fun verifyInputStream(inputStream: InputStream): Result<Unit> {
+    private fun verifyInputStream(inputStream: InputStream): Result<Unit> {
         return runCatching {
-            imageReaderMutex.withLock {
-                imageReader.input = inputStream
-                val imageCount = imageReader.getNumImages(true)
-                val images = (0..<imageCount).map {
-                    imageReader.read(it)
-                }
-                for (image in images) {
-                    val result = verifyInner(image)
-                    if (result.isFailure) {
-                        return result
-                    }
-                }
-                return Result.success(Unit)
+            val imageInputStream = ImageIO.createImageInputStream(inputStream)
+            val imageReader = ImageIO.getImageReaders(imageInputStream).next()
+                ?: return Result.failure(InvalidImageException(null, "No image reader found"))
+
+            imageReader.input = imageInputStream
+
+            val imageCount = imageReader.getNumImages(true)
+            val images = (0..<imageCount).map {
+                imageReader.read(it)
             }
+            for (image in images) {
+                val result = verifyInner(image)
+                if (result.isFailure) {
+                    return result
+                }
+            }
+            return Result.success(Unit)
         }
     }
 

@@ -1,26 +1,16 @@
 package org.lifeutils.nhentaidl.imageverifier
 
-import javax.imageio.ImageIO
-
 class ImageVerifierFactory {
-    private val pngBlankVerifier = BlankLineImageVerifier(
-        imageReader = ImageIO.getImageReadersByFormatName("png").next()
-    )
-    private val jpgBlankVerifier = BlankLineImageVerifier(
-        imageReader = ImageIO.getImageReadersByFormatName("jpg").next()
-    )
-    private val gifBlankVerifier = BlankLineImageVerifier(
-        imageReader = ImageIO.getImageReadersByFormatName("gif").next()
-    )
+    private val blankLineVerifier = BlankLineImageVerifier()
 
     private val pngVerifier = PngImageVerifier(
-        pngBlankLineVerifier = pngBlankVerifier
+        pngBlankLineVerifier = blankLineVerifier
     )
     private val jpgVerifier = JpgImageVerifier(
-        jpgBlankLineImageVerifier = jpgBlankVerifier
+        jpgBlankLineImageVerifier = blankLineVerifier
     )
     private val gifVerifier = GifImageVerifier(
-        gifBlankLineImageVerifier = gifBlankVerifier
+        gifBlankLineImageVerifier = blankLineVerifier
     )
 
     fun createImageVerifier(): GenericImageVerifier {

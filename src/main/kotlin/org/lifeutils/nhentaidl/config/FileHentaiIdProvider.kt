@@ -5,16 +5,8 @@ import java.io.File
 
 class FileHentaiIdProvider : HentaiIdProvider<FileHentaiIdProviderConfig> {
     override suspend fun provideIdsToDownload(config: FileHentaiIdProviderConfig): Result<List<HentaiId>> {
-        val file = config.file
-
-        if (!file.exists()) {
-            return Result.failure(IllegalArgumentException("File ${file.absolutePath} does not exist"))
-        }
-        if (!file.isFile) {
-            return Result.failure(IllegalArgumentException("File ${file.absolutePath} is not a file"))
-        }
-
-        val ids = file.readLines()
+        val ids = config.file
+            .readLines()
             .mapNotNull { it.toIntOrNull() }
             .map { HentaiId(it) }
         return Result.success(ids)
@@ -23,4 +15,14 @@ class FileHentaiIdProvider : HentaiIdProvider<FileHentaiIdProviderConfig> {
 
 data class FileHentaiIdProviderConfig(
     val file: File,
-) : HentaiIdProviderConfig
+) : HentaiIdProviderConfig {
+    fun verify() {
+        if (!file.exists()) {
+            throw IllegalArgumentException("File ${file.absolutePath} does not exist")
+        }
+
+        if (!file.isFile) {
+            throw IllegalArgumentException("File ${file.absolutePath} is not a file")
+        }
+    }
+}

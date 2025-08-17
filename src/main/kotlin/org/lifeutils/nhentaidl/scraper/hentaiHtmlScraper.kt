@@ -6,7 +6,6 @@ import org.jsoup.nodes.Element
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.HentaiInfo
 import org.lifeutils.nhentaidl.model.HentaiMetadata
-import org.lifeutils.nhentaidl.model.Language
 import java.time.ZonedDateTime
 
 private const val METADATA_SELECTOR = "div#info"
@@ -58,7 +57,7 @@ private fun extractHentaiInfo(id: HentaiId, doc: Document): HentaiInfo {
             characters = tags.tag(TagType.Characters),
             tags = tags.tag(TagType.Tags),
             artists = tags.tag(TagType.Artists),
-            language = tags.tag(TagType.Languages).mapNotNull { Language.fromString(it) },
+            language = tags.tag(TagType.Languages),
             groups = tags.tag(TagType.Groups),
             categories = tags.tag(TagType.Categories),
             uploadedAt = uploaded,

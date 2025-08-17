@@ -4,8 +4,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.client.statement.readBytes
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
 import kotlinx.coroutines.Dispatchers
@@ -27,12 +27,10 @@ private const val IMAGE_SIZE_LIMIT: Long = 32 * 1024 * 1024
 class HentaiScraper<WriterMeta : HentaiWriterMeta>(
     private val httpClient: HttpClient,
     private val httpConfig: HttpConfig,
-    private val hentaiWriter: HentaiWriter<WriterMeta>,
+    private val writer: HentaiWriter<WriterMeta>,
     private val log: Logger,
 ) {
-    suspend fun hentai(id: HentaiId): Result<Unit> {
-        log("Fetching hentai: ${id.id}")
-
+    suspend fun getHentaiInfo(id: HentaiId): Result<HentaiScrapResult> {
         val url = BASE_URL_HENTAI.replace("%hentaiId%", id.id.toString())
 
         val response = retryHttpRequest(delayMillis = httpConfig.requestDelayInMillis) {
@@ -47,9 +45,25 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
 
         val info = scrapHentaiTitlePage(id, response.bodyAsText())
 
-        val writerMeta = hentaiWriter.getWriterMeta(hentaiInfo = info.hentaiInfo).getOrElse {
+        return Result.success(info)
+    }
+
+    suspend fun hentai(id: HentaiId): Result<Unit> {
+        log("Fetching hentai: ${id.id}")
+
+        val info = getHentaiInfo(id).getOrElse {
             return Result.failure(it)
         }
+
+        val writerMeta = writer.getWriterMeta(hentaiInfo = info.hentaiInfo).getOrElse {
+            return Result.failure(it)
+        }
+
+        writer.writeHentaiInfo(writerMeta, info.hentaiInfo)
+            .onFailure {
+                writer.abort(writerMeta)
+                return Result.failure(it)
+            }
 
         val semaphore = Semaphore(httpConfig.concurrencyLevelImage)
         val imageDownloadFailureOccurred = AtomicBoolean(false)
@@ -80,17 +94,15 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
             Result.success(Unit)
         }
             .onFailure {
+                writer.abort(writerMeta)
                 return Result.failure(it)
             }
 
-        val metaWriteResult = hentaiWriter.writeHentaiInfo(writerMeta, info.hentaiInfo)
-        if (metaWriteResult.isFailure) {
-            return metaWriteResult
-        }
-
-        hentaiWriter.finish(writerMeta).onFailure {
-            return Result.failure(it)
-        }
+        writer.finish(writerMeta)
+            .onFailure {
+                writer.abort(writerMeta)
+                return Result.failure(it)
+            }
 
         log("Fetching hentai: ${id.id}... Total of ${info.hentaiInfo.pageCount} pages. Done")
 
@@ -121,7 +133,13 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
             return Result.failure(IllegalArgumentException("Image size is too large: $size"))
         }
 
-        val imageWriteResult = hentaiWriter.writeImage(writerMeta, hentaiPage.fileName, size, response.bodyAsChannel())
+        val contents = try {
+            response.readBytes()
+        } catch (e: Exception) {
+            return Result.failure(e)
+        }
+
+        val imageWriteResult = writer.writeImage(writerMeta, hentaiPage.fileName, contents)
         if (imageWriteResult.isFailure) {
             return imageWriteResult
         }

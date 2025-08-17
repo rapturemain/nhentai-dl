@@ -14,15 +14,15 @@ class StdoutLogger : Logger, AutoCloseable, Closeable {
         while (!Thread.interrupted()) {
             try {
                 printMessage(messageQueue.take())
-            } catch (e: InterruptedException) {
-                messageQueue.forEach(::printMessage)
+            } catch (_: InterruptedException) {
                 break
             }
         }
+
+        messageQueue.forEach(::printMessage)
     }
         .apply {
             name = "Logger"
-            isDaemon = true
         }
 
     init {
@@ -53,6 +53,7 @@ class StdoutLogger : Logger, AutoCloseable, Closeable {
 
     override fun close() {
         workerThread.interrupt()
+        // process rest
     }
 }
 

@@ -10,9 +10,22 @@ import org.lifeutils.nhentaidl.config.HentaiIdProvider
 import org.lifeutils.nhentaidl.config.SearchConfig
 import org.lifeutils.nhentaidl.log.Logger
 import org.lifeutils.nhentaidl.model.HentaiId
-import org.lifeutils.nhentaidl.model.Language
+import org.lifeutils.nhentaidl.model.oldmetadata.LanguageV3
+import java.net.URLEncoder
 
-private const val BASE_URL_LANGUAGE = "https://nhentai.net/language/%language%/"
+private const val BASE_SEARCH_URL = "https://nhentai.net/search/"
+
+private fun buildSearchUrl(language: LanguageV3?, artist: String?): String {
+    val query = StringBuilder()
+    if (language != null) {
+        query.append("language:${language.searchParam} ")
+    }
+    if (artist != null) {
+        query.append("artist:${artist} ")
+    }
+    val urlEncodedQuery = URLEncoder.encode(query.toString().trim(), Charsets.UTF_8)
+    return "${BASE_SEARCH_URL}?q=${urlEncodedQuery}"
+}
 
 private const val HREF_HENTAI_SELECTOR = "div.container div.gallery a"
 private fun extractIdFromHref(href: String) = href.split("/")
@@ -30,28 +43,40 @@ class SearchScraper(
     private val log: Logger,
 ) : HentaiIdProvider<SearchConfig> {
 
-    suspend fun search(language: Language, pages: IntRange = 1..<Int.MAX_VALUE): SearchResult {
-        return fetchPages(BASE_URL_LANGUAGE.replace("%language%", language.searchParam), pages)
+    suspend fun search(
+        language: LanguageV3?,
+        artist: String?,
+        pages: IntRange = 1..<Int.MAX_VALUE,
+        limit: Int,
+    ): SearchResult {
+        val searchUrl = buildSearchUrl(language, artist)
+        return fetchPages(searchUrl, pages, limit)
     }
 
-    private suspend fun fetchPages(baseUrl: String, pages: IntRange): SearchResult {
+    private suspend fun fetchPages(baseUrl: String, pages: IntRange, limit: Int): SearchResult {
         val allIds = mutableSetOf<HentaiId>()
         val failedPages = mutableListOf<String>()
 
         var totalPages: Int? = null
 
         for (page in pages) {
+            if (allIds.size >= limit) {
+                break
+            }
+            if (page > (totalPages ?: Int.MAX_VALUE)) {
+                break
+            }
+
             try {
                 val content = fetchPage(baseUrl, page, totalPages)
-
                 val scrapResult = scrapPage(content)
-                totalPages = scrapResult.totalPages ?: totalPages
-
                 if (scrapResult.ids.isEmpty()) {
                     break // no more pages
                 }
+
+                totalPages = scrapResult.totalPages ?: totalPages
                 allIds += scrapResult.ids
-            } catch (e: CannotFetchException) {
+            } catch (_: CannotFetchException) {
                 failedPages.add("BaseUrl: $baseUrl, page=$page")
             }
 
@@ -82,7 +107,12 @@ class SearchScraper(
     }
 
     private suspend fun fetchPage(baseUrl: String, page: Int, totalPages: Int?): String {
-        val url = "$baseUrl?page=$page"
+        val url = if (baseUrl.contains("?")) {
+            "${baseUrl}&page=$page"
+        } else {
+            "${baseUrl}?page=$page"
+        }
+
         return retryHttpRequest(delayMillis = httpConfig.requestDelayInMillis) {
             log("Fetching page $url" + if (totalPages != null) " of $totalPages" else "")
 
@@ -99,7 +129,11 @@ class SearchScraper(
     }
 
     override suspend fun provideIdsToDownload(config: SearchConfig): Result<List<HentaiId>> {
-        val searchResult = search(config.searchLanguage)
+        val searchResult = search(
+            language = config.searchLanguage,
+            artist = config.searchArtist,
+            limit = config.countLimit
+        )
         if (searchResult.failedPages.isNotEmpty()) {
             return Result.failure(CannotFetchException("Failed to fetch pages: ${searchResult.failedPages}"))
         }

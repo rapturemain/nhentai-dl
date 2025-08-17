@@ -27,7 +27,6 @@ I identified a few areas where performance and stability could be improved:
 1. High CPU usage due to the use of Python multiprocessing.
 2. Slower download speeds as a result of sequential downloading of each title and the overhead of subprocess creation.
 3. Occasional corrupted images in the downloaded doujinshi (approximately 10% titles affected).
-4. (!!!) My clicky external HDD doesn't like the constant read/write operations. 
 
 To overcome these limitations, I developed this project in Kotlin, focusing on improved efficiency, 
 parallel processing, and image integrity.
