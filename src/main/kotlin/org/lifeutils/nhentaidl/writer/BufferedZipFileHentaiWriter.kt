@@ -1,6 +1,5 @@
 package org.lifeutils.nhentaidl.writer
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.sync.Mutex
 import org.lifeutils.nhentaidl.config.WriterConfig
 import org.lifeutils.nhentaidl.getMessageWithCause
@@ -11,6 +10,7 @@ import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.HentaiInfo
 import org.lifeutils.nhentaidl.model.ImageVerificationStatus
 import org.lifeutils.nhentaidl.model.Metadata
+import tools.jackson.databind.json.JsonMapper
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedDeque
@@ -19,7 +19,7 @@ import java.util.zip.ZipOutputStream
 
 class BufferedZipFileHentaiWriter(
     private val writerConfig: WriterConfig,
-    private val objectMapper: ObjectMapper,
+    private val objectMapper: JsonMapper,
     private val log: Logger,
     private val imageVerifier: ImageVerifier? = null,
 ) : HentaiWriter<BufferedZipFileHentaiWriterMeta> {

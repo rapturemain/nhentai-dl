@@ -1,13 +1,13 @@
 package org.lifeutils.nhentaidl.migration
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.lifeutils.nhentaidl.model.CURRENT_VERSION
 import org.lifeutils.nhentaidl.model.Metadata
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 import java.io.File
 
 class MigrationServiceCurrent(
-    private val objectMapper: ObjectMapper
+    private val objectMapper: JsonMapper
 ) : MigrationService {
     override suspend fun migrate(file: File, outputFile: File): Result<Unit> {
         throw NotImplementedError("SHOULD NOT BE CALLED")

@@ -1,9 +1,5 @@
 package org.lifeutils.nhentaidl.cli
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpTimeout
 import org.lifeutils.nhentaidl.config.FileHentaiIdProvider
@@ -16,6 +12,9 @@ import org.lifeutils.nhentaidl.writer.BufferedZipFileHentaiWriter
 import org.lifeutils.nhentaidl.writer.FileHentaiWriter
 import org.lifeutils.nhentaidl.writer.HentaiWriter
 import sun.misc.Signal
+import tools.jackson.databind.SerializationFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.kotlinModule
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.system.exitProcess
@@ -26,7 +25,7 @@ class ApplicationContext(val config: Config) {
     val hentaiScraper: HentaiScraper<*>
     val fileHentaiIdProvider: FileHentaiIdProvider = FileHentaiIdProvider()
     val logger = StdoutLogger()
-    val objectMapper: ObjectMapper
+    val objectMapper: JsonMapper
 
     val isInterrupted = AtomicBoolean(false)
     private val isInterruptedTime = AtomicLong(0)
@@ -53,11 +52,11 @@ class ApplicationContext(val config: Config) {
             }
         }
 
-        objectMapper = ObjectMapper()
-            .registerModule(JavaTimeModule())
-            .registerKotlinModule()
+
+        objectMapper = JsonMapper.builder()
+            .addModule(kotlinModule())
             .enable(SerializationFeature.INDENT_OUTPUT)
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .build()
 
         val imageVerifier = if (config.verifyImages) {
             ImageVerifierFactory().createImageVerifier()

@@ -1,4 +1,4 @@
-# Porn Downloader Enterprise Edition
+# NHentai-DL
 A simple Kotlin CLI program to download doujinshi from [nhentai.net](https://nhentai.net/).
 
 ## Usage

@@ -9,8 +9,8 @@ import org.lifeutils.nhentaidl.model.HentaiMetadata
 import java.time.ZonedDateTime
 
 private const val METADATA_SELECTOR = "div#info"
-private const val TITLE_SELECTOR = "$METADATA_SELECTOR h1.title span"
-private const val SUBTITLE_SELECTOR = "$METADATA_SELECTOR h2.title span"
+private const val TITLE_SELECTOR = "$METADATA_SELECTOR h1.title"
+private const val SUBTITLE_SELECTOR = "$METADATA_SELECTOR h2.title"
 private const val TAGS_SELECTOR = "$METADATA_SELECTOR section#tags div.tag-container"
 private const val TAG_VALUE_SELECTOR = "span.name"
 private const val PAGES_SELECTOR = "div.thumbs div.thumb-container"
@@ -107,8 +107,12 @@ private fun Map<TagType, List<String>>.tag(tagType: TagType): List<String> {
 private fun extractPages(doc: Document): List<HentaiPage> {
     return doc.select(PAGES_SELECTOR)
         .map {
-            val pageUrl = it.selectFirst("noscript > img")!!
-                .attr("src")
+            val pageUrl = it.selectFirst("div > a > img")
+                ?.attr("src")
+
+            checkNotNull(pageUrl) {
+                "Single page picture IMG SRC is missing... maybe page structure has changed"
+            }
 
             val thumbBaseUrl = pageUrl.substringBeforeLast("/")
             val juicyBaseUrl = thumbBaseUrl.replace(Regex("t(?=\\d+\\.)"), "i")

@@ -1,12 +1,12 @@
 package org.lifeutils.nhentaidl.migration
 
-import com.fasterxml.jackson.databind.JsonNode
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.HentaiInfo
 import org.lifeutils.nhentaidl.scraper.HentaiScraper
 import org.lifeutils.nhentaidl.writer.HentaiWriter
 import org.lifeutils.nhentaidl.writer.HentaiWriterMeta
 import org.lifeutils.nhentaidl.writer.METADATA_FILE_NAME
+import tools.jackson.databind.JsonNode
 import java.io.File
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry

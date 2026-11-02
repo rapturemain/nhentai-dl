@@ -6,6 +6,7 @@ import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.client.statement.readBytes
+import io.ktor.client.statement.readRawBytes
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentLength
 import kotlinx.coroutines.Dispatchers
@@ -134,7 +135,7 @@ class HentaiScraper<WriterMeta : HentaiWriterMeta>(
         }
 
         val contents = try {
-            response.readBytes()
+            response.readRawBytes()
         } catch (e: Exception) {
             return Result.failure(e)
         }

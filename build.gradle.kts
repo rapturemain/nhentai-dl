@@ -1,36 +1,38 @@
 plugins {
-    kotlin("jvm") version "2.2.10"
+    kotlin("jvm") version "2.4.21"
     application
 }
 
 group = "org.lifeutils"
-version = "1.1"
+version = "1.1.1"
 
 repositories {
     mavenCentral()
 }
 
-val ktorVersion: String by project
+val jsoupVersion = "1.23.2"
+val ktorVersion = "3.6.1"
+val slf4jVersion = "2.0.20"
+val junitVersion = "5.13.4"
 
 dependencies {
-    implementation("org.jsoup:jsoup:1.18.1")
+    implementation("org.jsoup:jsoup:$jsoupVersion")
 
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
+    implementation("tools.jackson.core:jackson-core:3.2.4")
+    implementation("tools.jackson.module:jackson-module-kotlin:3.2.4")
 
     implementation("io.ktor:ktor-client-core:$ktorVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
 
-    implementation("org.slf4j:slf4j-api:2.0.16")
-    implementation("org.slf4j:slf4j-simple:2.0.16")
+    implementation("org.slf4j:slf4j-api:$slf4jVersion")
+    implementation("org.slf4j:slf4j-simple:$slf4jVersion")
 
     implementation("org.jetbrains.kotlinx:kotlinx-cli:0.3.6")
 
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.13.3")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.13.3")
-    testImplementation("org.assertj:assertj-core:3.8.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:$junitVersion")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:$junitVersion")
+    testImplementation("org.assertj:assertj-core:3.27.7")
 }
 
 tasks.test {

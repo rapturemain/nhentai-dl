@@ -1,6 +1,5 @@
 package org.lifeutils.nhentaidl
 
-import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.WithAssertions
 import org.junit.jupiter.api.io.TempDir
@@ -33,7 +32,7 @@ class SingleDownloadTests : WithAssertions {
                 language = listOf("japanese"),
                 groups = listOf("nakayohi mogudan"),
                 categories = listOf("doujinshi"),
-                uploadedAt = ZonedDateTime.parse("2014-06-28T14:14:15.321934Z"),
+                uploadedAt = ZonedDateTime.parse("2014-06-28T14:14:15Z"),
                 characters = listOf("rei ayanami"),
             ),
         ), appMetadata = AppMetadata(
@@ -117,7 +116,7 @@ class SingleDownloadTests : WithAssertions {
         val hentaiDir = tempDir.resolve(expectedDirectoryName)
 
         val metadata = hentaiDir.resolve("metadata.json")
-        val metadataContents = appContext.objectMapper.readValue<Metadata>(metadata)
+        val metadataContents = appContext.objectMapper.readValue(metadata, Metadata::class.java)
         assertThat(metadataContents).isEqualTo(expectedMetadata)
 
         val filesCount = hentaiDir.listFiles().size

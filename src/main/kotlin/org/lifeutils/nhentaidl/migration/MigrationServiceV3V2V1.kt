@@ -1,17 +1,17 @@
 package org.lifeutils.nhentaidl.migration
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.lifeutils.nhentaidl.model.HentaiId
 import org.lifeutils.nhentaidl.model.oldmetadata.HentaiInfoV1
 import org.lifeutils.nhentaidl.model.oldmetadata.HentaiInfoV3
 import org.lifeutils.nhentaidl.scraper.HentaiScraper
 import org.lifeutils.nhentaidl.writer.HentaiWriter
 import org.lifeutils.nhentaidl.writer.METADATA_FILE_NAME
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 import java.io.File
 
 fun createMigrationServiceV3V2V1(
-    objectMapper: ObjectMapper,
+    objectMapper: JsonMapper,
     hentaiScraper: HentaiScraper<*>,
     hentaiWriter: HentaiWriter<*>,
 ): MigrationService {
@@ -23,7 +23,7 @@ fun createMigrationServiceV3V2V1(
 }
 
 class MigrationExtensionsV3V2V1(
-    private val objectMapper: ObjectMapper,
+    private val objectMapper: JsonMapper,
 ) : MigrationExtensions {
     companion object {
         private val IMAGE_NAME_REGEX = Regex("\\d+\\.\\w+")

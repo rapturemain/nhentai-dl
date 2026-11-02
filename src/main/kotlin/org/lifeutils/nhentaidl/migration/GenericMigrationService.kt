@@ -1,17 +1,17 @@
 package org.lifeutils.nhentaidl.migration
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.lifeutils.nhentaidl.config.MigrationConfig
 import org.lifeutils.nhentaidl.scraper.HentaiScraper
 import org.lifeutils.nhentaidl.writer.HentaiWriter
 import org.lifeutils.nhentaidl.writer.METADATA_FILE_NAME
+import tools.jackson.databind.json.JsonMapper
 import java.io.File
 import java.util.zip.ZipInputStream
 
 const val SCHEDULED_FOR_MIGRATION_PREFIX = "MIGRATION_"
 
 class GenericMigrationService(
-    private val objectMapper: ObjectMapper,
+    private val objectMapper: JsonMapper,
     private val migrators: List<MigrationService>,
     private val migrationConfig: MigrationConfig,
 ) {
@@ -134,7 +134,7 @@ class GenericMigrationService(
 }
 
 fun createMigrationService(
-    objectMapper: ObjectMapper,
+    objectMapper: JsonMapper,
     hentaiWriter: HentaiWriter<*>,
     hentaiScraper: HentaiScraper<*>,
     migrationConfig: MigrationConfig,
